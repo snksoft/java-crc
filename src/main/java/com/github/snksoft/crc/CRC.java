@@ -13,10 +13,50 @@ package com.github.snksoft.crc;
 // A good list of parameter sets for various CRC algorithms can be found at http://reveng.sourceforge.net/crc-catalogue/.
 
 /**
- * This class provides utility functions for CRC calculation using either canonical straight forward approach
- * or using "fast" table-driven implementation. Note, that even though table-driven implementation is much faster
- * for processing large amounts of data and is commonly referred as fast algorithm, sometimes it might be quicker to
- * calculate CRC using canonical algorithm then to prepare the table for table-driven implementation.
+ This class provides utility functions for CRC calculation using either canonical straight forward approach
+ or using "fast" table-driven implementation. Note, that even though table-driven implementation is much faster
+ for processing large amounts of data and is commonly referred as fast algorithm, sometimes it might be quicker to
+ calculate CRC using canonical algorithm then to prepare the table for table-driven implementation.
+ 
+<p> 
+Using src is easy. Here is an example of calculating CCITT crc in one call using canonical approach. 
+<pre>
+{@code
+    String data = "123456789";
+    long ccittCrc = CRC.calculateCRC(CRC.Parameters.CCITT, data.getBytes());
+    System.out.printf("CRC is 0x%04X\n", ccittCrc); // prints "CRC is 0x29B1"
+}
+</pre>
+
+<p>
+For larger data, table driven implementation is faster. Here is how to use it.
+
+<pre>
+{@code
+        String data = "123456789";
+       	CRC tableDriven = new CRC(CRC.Parameters.XMODEM);
+       	long xmodemCrc = tableDriven.calculateCRC(data.getBytes());
+        System.out.printf("CRC is 0x%04X\n", xmodemCrc); // prints "CRC is 0x31C3"
+}
+</pre>
+
+<p>
+        You can also reuse CRC object instance for another crc calculation.
+<p>
+        Given that the only state for a CRC calculation is the "intermediate value"
+        and it is stored in your code, you can even use same CRC instance to calculate CRC
+        of multiple data sets in parallel.
+        And if data is too big, you may feed it in chunks
+<pre>
+{@code
+       long curValue = tableDriven.init(); // initialize intermediate value
+       curValue = tableDriven.update(curValue, "123456789".getBytes()); // feed first chunk
+       curValue = tableDriven.update(curValue, "01234567890".getBytes()); // feed next chunk
+       long xmodemCrc2 = tableDriven.finalCRC(curValue); // gets CRC of whole data ("12345678901234567890")
+       System.out.printf("CRC is 0x%04X\n", xmodemCrc2); // prints "CRC is 0x2C89"
+}
+</pre>
+
  * */
 public class CRC
 {
