@@ -63,7 +63,7 @@ public class CRC
     /**
      *  Parameters represents set of parameters defining a particular CRC algorithm.
      * */
-    public static class Parameters
+    public static class Parameters implements Cloneable
     {
         private int width;   // Width of the CRC expressed in bits
         private long polynomial; // Polynomial used in this CRC calculation
@@ -82,14 +82,15 @@ public class CRC
             this.finalXor = finalXor;
         }
 
-        public Parameters(Parameters orig)
-        {
-            width = orig.width;
-            polynomial = orig.polynomial;
-            reflectIn = orig.reflectIn;
-            reflectOut = orig.reflectOut;
-            init = orig.init;
-            finalXor = orig.finalXor;
+        @Override
+        public Object clone() {
+            return new Parameters(
+                    width,
+                    polynomial,
+                    init,
+                    reflectIn,
+                    reflectOut,
+                    finalXor);
         }
 
         public int getWidth()
@@ -314,7 +315,7 @@ public class CRC
      */
     public CRC(Parameters crcParams)
     {
-        this.crcParams = new Parameters(crcParams); // TODO: implement copy constructor;
+        this.crcParams = (Parameters) crcParams.clone();
 
         initValue = (crcParams.reflectIn) ? reflect(crcParams.init, crcParams.width) : crcParams.init;
         this.mask = ((crcParams.width>=64) ? 0 : (1L << crcParams.width)) - 1;
@@ -322,7 +323,7 @@ public class CRC
 
         byte[] tmp = new byte[1];
 
-        Parameters tableParams = new Parameters(crcParams);
+        Parameters tableParams = (Parameters) crcParams.clone();
 
         tableParams.init = 0;
         tableParams.reflectOut = tableParams.reflectIn;
