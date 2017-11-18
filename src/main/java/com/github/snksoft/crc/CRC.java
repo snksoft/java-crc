@@ -314,7 +314,7 @@ public class CRC
      */
     public CRC(Parameters crcParams)
     {
-        this.crcParams = new Parameters(crcParams); // TODO: implement copy constructor;
+        this.crcParams = new Parameters(crcParams);
 
         initValue = (crcParams.reflectIn) ? reflect(crcParams.init, crcParams.width) : crcParams.init;
         this.mask = ((crcParams.width>=64) ? 0 : (1L << crcParams.width)) - 1;
