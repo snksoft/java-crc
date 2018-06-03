@@ -196,16 +196,20 @@ public class CRC
             {
                 curByte = reflect(curByte, 8);
             }
-            curValue ^= (curByte << (crcParams.width - 8));
-            for (int j=0; j< 8; j++)
+
+            for (int j = 0x80; j != 0; j >>= 1)
             {
-                if ((curValue & topBit)!=0)
+                long bit = curValue & topBit;
+                curValue <<= 1;
+
+                if ((curByte & j) != 0)
                 {
-                    curValue = (curValue << 1) ^ crcParams.polynomial;
+                    bit ^= topBit;
                 }
-                else
+
+                if (bit != 0)
                 {
-                    curValue = (curValue << 1);
+                    curValue ^= crcParams.polynomial;
                 }
             }
 
@@ -311,9 +315,15 @@ public class CRC
      * Constructs a new CRC processor for table based CRC calculations.
      * Underneath, it just calls finalCRC() method.
      * @param  crcParams CRC algorithm parameters
+     * @throws RuntimeException if CRC sum width is not divisible by 8
      */
     public CRC(Parameters crcParams)
     {
+        if (crcParams.width % 8 != 0)
+        {
+            throw new RuntimeException("Table based CRC calculation not supported for CRC sum width of " + crcParams.width);
+        }
+
         this.crcParams = new Parameters(crcParams);
 
         initValue = (crcParams.reflectIn) ? reflect(crcParams.init, crcParams.width) : crcParams.init;

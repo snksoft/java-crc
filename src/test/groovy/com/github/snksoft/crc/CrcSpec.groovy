@@ -4,6 +4,36 @@ import spock.lang.Specification
 
 class CrcSpec extends Specification{
 
+    def "CRC3 to CRC7 Tests (only non-table-driven calculation is supported)"() {
+
+        when:
+        byte[] dataBytes = data.getBytes()
+        long calculated1 = CRC.calculateCRC(crcParams, dataBytes)
+
+        then:
+        calculated1 == crc
+
+        when:
+        new CRC(crcParams)
+
+        then:
+        RuntimeException e = thrown(RuntimeException)
+        e.message == "Table based CRC calculation not supported for CRC sum width of ${crcParams.width}"
+
+        where:
+        crcParams                                            | crc  | data
+        new CRC.Parameters(3, 0x03, 0x00, false, false, 0x7) | 0x04 | "123456789" // CRC-3/GSM
+        new CRC.Parameters(3, 0x03, 0x07, true,  true,  0x0) | 0x06 | "123456789" // CRC-3/ROHC
+        new CRC.Parameters(4, 0x03, 0x00, true,  true,  0x0) | 0x07 | "123456789" // CRC-4/ITU
+        new CRC.Parameters(4, 0x03, 0x0f, false, false, 0xf) | 0x0b | "123456789" // CRC-4/INTERLAKEN
+        new CRC.Parameters(5, 0x09, 0x09, false, false, 0x0) | 0x00 | "123456789" // CRC-5/EPC
+        new CRC.Parameters(5, 0x15, 0x00, true,  true,  0x0) | 0x07 | "123456789" // CRC-5/ITU
+        new CRC.Parameters(6, 0x27, 0x3f, false, false, 0x0) | 0x0d | "123456789" // CRC-6/CDMA2000-A
+        new CRC.Parameters(6, 0x07, 0x3f, false, false, 0x0) | 0x3b | "123456789" // CRC-6/CDMA2000-B
+        new CRC.Parameters(7, 0x09, 0x00, false, false, 0x0) | 0x75 | "123456789" // CRC-7
+        new CRC.Parameters(7, 0x4f, 0x7f, true,  true,  0x0) | 0x53 | "123456789" // CRC-7/ROHC
+    }
+
     def "CRC8 Tests"() {
 
         when:
