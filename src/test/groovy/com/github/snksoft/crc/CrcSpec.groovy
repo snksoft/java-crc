@@ -4,34 +4,64 @@ import spock.lang.Specification
 
 class CrcSpec extends Specification{
 
-    def "CRC3 to CRC7 Tests (only non-table-driven calculation is supported)"() {
+    private static final longText = "Whenever digital data is stored or interfaced, data corruption might occur. Since the beginning of computer science, people have been thinking of ways to deal with this type of problem. For serial data they came up with the solution to attach a parity bit to each sent byte. This simple detection mechanism works if an odd number of bits in a byte changes, but an even number of false bits in one byte will not be detected by the parity check. To overcome this problem people have searched for mathematical sound mechanisms to detect multiple false bits."
 
+    private static byte[] testArray = null
+
+    static {
+        testArray = new byte[256];
+        for (int i=0; i<testArray.length; i++)
+        {
+            testArray[i] = (byte)(i&0x0FF)
+        }
+    }
+
+    def "Test CRC polynomials of various widths"() {
         when:
-        byte[] dataBytes = data.getBytes()
-        long calculated1 = CRC.calculateCRC(crcParams, dataBytes)
-
+            byte[] dataBytes = data instanceof byte[] ? data : data.getBytes()
+            long calculated1 = CRC.calculateCRC(crcParams, dataBytes)
         then:
-        calculated1 == crc
-
+            calculated1 == crc
         when:
-        new CRC(crcParams)
-
+            CRC table = new CRC(crcParams)
+            long tableBasedCrc = table.calculateCRC(dataBytes)
         then:
-        RuntimeException e = thrown(RuntimeException)
-        e.message == "Table based CRC calculation not supported for CRC sum width of ${crcParams.width}"
+            tableBasedCrc == crc
 
         where:
-        crcParams                                            | crc  | data
-        new CRC.Parameters(3, 0x03, 0x00, false, false, 0x7) | 0x04 | "123456789" // CRC-3/GSM
-        new CRC.Parameters(3, 0x03, 0x07, true,  true,  0x0) | 0x06 | "123456789" // CRC-3/ROHC
-        new CRC.Parameters(4, 0x03, 0x00, true,  true,  0x0) | 0x07 | "123456789" // CRC-4/ITU
-        new CRC.Parameters(4, 0x03, 0x0f, false, false, 0xf) | 0x0b | "123456789" // CRC-4/INTERLAKEN
-        new CRC.Parameters(5, 0x09, 0x09, false, false, 0x0) | 0x00 | "123456789" // CRC-5/EPC
-        new CRC.Parameters(5, 0x15, 0x00, true,  true,  0x0) | 0x07 | "123456789" // CRC-5/ITU
-        new CRC.Parameters(6, 0x27, 0x3f, false, false, 0x0) | 0x0d | "123456789" // CRC-6/CDMA2000-A
-        new CRC.Parameters(6, 0x07, 0x3f, false, false, 0x0) | 0x3b | "123456789" // CRC-6/CDMA2000-B
-        new CRC.Parameters(7, 0x09, 0x00, false, false, 0x0) | 0x75 | "123456789" // CRC-7
-        new CRC.Parameters(7, 0x4f, 0x7f, true,  true,  0x0) | 0x53 | "123456789" // CRC-7/ROHC
+            crcParams                                                | crc  | data
+            new CRC.Parameters(3, 0x03, 0x00, false, false, 0x7) | 0x04 | "123456789" // CRC-3/GSM
+            new CRC.Parameters(3, 0x03, 0x00, false, false, 0x7) | 0x06 | longText
+            new CRC.Parameters(3, 0x03, 0x00, false, false, 0x7) | 0x02 | testArray
+            new CRC.Parameters(3, 0x03, 0x07, true,  true,  0x0) | 0x06 | "123456789" // CRC-3/ROHC
+            new CRC.Parameters(3, 0x03, 0x07, true,  true,  0x0) | 0x03 |longText
+            new CRC.Parameters(4, 0x03, 0x00, true,  true,  0x0) | 0x07 | "123456789" // CRC-4/ITU
+            new CRC.Parameters(4, 0x03, 0x0f, false, false, 0xf) | 0x0b | "123456789" // CRC-4/INTERLAKEN
+            new CRC.Parameters(4, 0x03, 0x0f, false, false, 0xf) | 0x01 | longText // CRC-4/INTERLAKEN
+            new CRC.Parameters(4, 0x03, 0x0f, false, false, 0xf) | 0x07 | testArray // CRC-4/INTERLAKEN
+            new CRC.Parameters(5, 0x09, 0x09, false, false, 0x0) | 0x00 | "123456789" // CRC-5/EPC
+            new CRC.Parameters(5, 0x15, 0x00, true,  true,  0x0) | 0x07 | "123456789" // CRC-5/ITU
+            new CRC.Parameters(6, 0x27, 0x3f, false, false, 0x0) | 0x0d | "123456789" // CRC-6/CDMA2000-A
+            new CRC.Parameters(6, 0x07, 0x3f, false, false, 0x0) | 0x3b | "123456789" // CRC-6/CDMA2000-B
+            new CRC.Parameters(6, 0x07, 0x3f, false, false, 0x0) | 0x24 | testArray // CRC-6/CDMA2000-B
+            new CRC.Parameters(7, 0x09, 0x00, false, false, 0x0) | 0x75 | "123456789" // CRC-7
+            new CRC.Parameters(7, 0x09, 0x00, false, false, 0x0) | 0x78 | testArray // CRC-7
+            new CRC.Parameters(7, 0x4f, 0x7f, true,  true,  0x0) | 0x53 | "123456789" // CRC-7/ROHC
+
+            new CRC.Parameters(12, 0xd31, 0x00, false, false, 0xfff) | 0x0b34 | "123456789" // CRC-12/GSM
+            new CRC.Parameters(12, 0x80f, 0x00, false, true, 0x00) | 0x0daf | "123456789" // CRC-12/UMTS
+            new CRC.Parameters(13, 0x1cf5, 0x00, false, false, 0x00) | 0x04fa | "123456789" // CRC-13/BBC
+            new CRC.Parameters(14, 0x0805, 0x00, true, true, 0x00) | 0x082d | "123456789" // CRC-14/DARC
+            new CRC.Parameters(14, 0x202d, 0x00, false, false, 0x3fff) | 0x30ae | "123456789" // CRC-14/GSM
+
+            new CRC.Parameters(15, 0x4599, 0x00, false, false, 0x00) | 0x059e | "123456789" // CRC-15
+            new CRC.Parameters(15, 0x4599, 0x00, false, false, 0x00) | 0x2857 | longText
+            new CRC.Parameters(15, 0x6815, 0x00, false, false, 0x0001) | 0x2566 | "123456789" // CRC-15/MPT1327
+
+            new CRC.Parameters(21, 0x102899, 0x000000, false, false, 0x000000) | 0x0ed841 | "123456789" // CRC-21/CAN-FD
+            new CRC.Parameters(24, 0x864cfb, 0xb704ce, false, false, 0x000000) | 0x21cf02 | "123456789" // CRC-24
+            new CRC.Parameters(24, 0x5d6dcb, 0xfedcba, false, false, 0x000000) | 0x7979bd | "123456789" // CRC-24/FLEXRAY-A
+            new CRC.Parameters(31, 0x04c11db7, 0x7fffffff, false, false, 0x7fffffff) | 0x0ce9e46c | "123456789" // CRC-31/PHILIPS
     }
 
     def "CRC8 Tests"() {

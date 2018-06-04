@@ -179,6 +179,12 @@ public class CRC
      * It is relatively slow for large amounts of data, but does not require
      * any preparation steps. As a result, it might be faster in some cases
      * then building a table required for faster calculation.
+     *
+     * Note: this implementation follows section 8 ("A Straightforward CRC Implementation")
+     * of Ross N. Williams paper as even though final/sample implementation of this algorithm
+     * provided near the end of that paper (and followed by most other implementations)
+     * is a bit faster, it does not work for polynomials shorter then 8 bits.
+     *
      * @param  crcParams CRC algorithm parameters
      * @param  data data for the CRC calculation
      * @return      the CRC value of the data provided
@@ -261,6 +267,14 @@ public class CRC
                 curValue = crctable[(((byte)curValue) ^ v)&0x00FF]^(curValue >>> 8);
             }
         }
+        else if (crcParams.width<8)
+        {
+            for (int i=0; i < length; i++)
+            {
+                byte v = chunk[offset+i];
+                curValue = crctable[((((byte)(curValue << (8-crcParams.width))) ^ v)&0xFF)]^(curValue << 8);
+            }
+        }
         else
         {
             for (int i=0; i < length; i++)
@@ -319,11 +333,6 @@ public class CRC
      */
     public CRC(Parameters crcParams)
     {
-        if (crcParams.width % 8 != 0)
-        {
-            throw new RuntimeException("Table based CRC calculation not supported for CRC sum width of " + crcParams.width);
-        }
-
         this.crcParams = new Parameters(crcParams);
 
         initValue = (crcParams.reflectIn) ? reflect(crcParams.init, crcParams.width) : crcParams.init;
