@@ -68,7 +68,7 @@ public class CRC
         private int width;   // Width of the CRC expressed in bits
         private long polynomial; // Polynomial used in this CRC calculation
         private boolean reflectIn;   // Refin indicates whether input bytes should be reflected
-        private boolean reflectOut;   // Refout indicates whether input bytes should be reflected
+        private boolean reflectOut;   // Refout indicates whether output bytes should be reflected
         private long init; // Init is initial value for CRC calculation
         private long finalXor; // Xor is a value for final xor to be applied before returning result
 
