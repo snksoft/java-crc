@@ -191,11 +191,17 @@ public class CRC
      */
     public static long calculateCRC(Parameters crcParams, byte[] data)
     {
-        long curValue =crcParams.init;
+        return calculateCRC(crcParams, data, 0, data.length);
+    }
+
+    public static long calculateCRC(Parameters crcParams, byte[] data, int offset, int length)
+    {
+        long curValue = crcParams.init;
         long topBit = 1L << (crcParams.width - 1);
         long mask = (topBit << 1) - 1;
+        int end = offset + length;
 
-        for (int i=0; i< data.length; i++)
+        for (int i = offset; i < end; i ++)
         {
             long curByte = ((long)(data[i])) & 0x00FFL;
             if (crcParams.reflectIn)
