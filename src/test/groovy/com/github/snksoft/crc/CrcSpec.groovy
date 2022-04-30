@@ -61,6 +61,8 @@ class CrcSpec extends Specification{
             new CRC.Parameters(21, 0x102899, 0x000000, false, false, 0x000000) | 0x0ed841 | "123456789" // CRC-21/CAN-FD
             new CRC.Parameters(24, 0x864cfb, 0xb704ce, false, false, 0x000000) | 0x21cf02 | "123456789" // CRC-24
             new CRC.Parameters(24, 0x5d6dcb, 0xfedcba, false, false, 0x000000) | 0x7979bd | "123456789" // CRC-24/FLEXRAY-A
+            new CRC.Parameters(24, 0x00065b, 0x555555,  true,  true, 0x000000) | 0xc25a56 | "123456789" // "CRC-24/BLE"
+
             new CRC.Parameters(31, 0x04c11db7, 0x7fffffff, false, false, 0x7fffffff) | 0x0ce9e46c | "123456789" // CRC-31/PHILIPS
     }
 
@@ -210,6 +212,27 @@ class CrcSpec extends Specification{
             CRC.Parameters.Koopman    | 0x1B8101F9 | "Introduction on CRC calculations"
             CRC.Parameters.Koopman    | 0xA41634B2 | "Whenever digital data is stored or interfaced, data corruption might occur. Since the beginning of computer science, people have been thinking of ways to deal with this type of problem. For serial data they came up with the solution to attach a parity bit to each sent byte. This simple detection mechanism works if an odd number of bits in a byte changes, but an even number of false bits in one byte will not be detected by the parity check. To overcome this problem people have searched for mathematical sound mechanisms to detect multiple false bits."
     }
+
+    def "CRC32 Tests for calculateCRC with offset and length "() {
+        when:
+            byte[] dataBytes = data.getBytes()
+            long calculated1 = CRC.calculateCRC(crcParams, dataBytes, offset, length)
+
+            // same test using table driven
+            CRC tableDriven = new CRC(crcParams)
+            long calculated2 = tableDriven.calculateCRC(dataBytes, offset, length)
+
+        then:
+            calculated1 == crc
+            calculated2 == crc
+
+        where:
+            crcParams                 |  crc        | offset | length | data
+            CRC.Parameters.CRC32      | 0xCBF43926L |      0 |      9 | "123456789Introduction on CRC calculations12345678901234567890"
+            CRC.Parameters.CRC32      | 0x906319F2L |     41 |     20 | "123456789Introduction on CRC calculations12345678901234567890"
+            CRC.Parameters.CRC32      | 0x814F2B45L |      9 |     32 | "123456789Introduction on CRC calculations12345678901234567890"
+    }
+
 
     def "CRC64 Tests"() {
 

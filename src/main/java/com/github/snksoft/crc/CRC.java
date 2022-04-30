@@ -326,8 +326,13 @@ public class CRC
      * */
     public long calculateCRC(byte[] data)
     {
+        return calculateCRC(data, 0, data.length);
+    }
+
+    public long calculateCRC(byte[] data, int offset, int length)
+    {
         long crc = init();
-        crc = update(crc, data);
+        crc = update(crc, data, offset, length);
         return finalCRC(crc);
     }
 
