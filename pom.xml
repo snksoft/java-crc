@@ -4,7 +4,7 @@
   
   <groupId>com.github.snksoft</groupId>
   <artifactId>crc</artifactId>
-  <version>1.0.3</version>
+  <version>1.1.0</version>
   <packaging>jar</packaging>
   
   <name>${project.groupId}:${project.artifactId}</name>
@@ -98,6 +98,14 @@
         <show>public</show>
         <nohelp>true</nohelp>
       </configuration>
+      <executions>
+        <execution>
+          <id>attach-javadocs</id>
+          <goals>
+            <goal>jar</goal>
+          </goals>
+        </execution>
+      </executions>
       </plugin>
 
       <!-- maven deployment -->
