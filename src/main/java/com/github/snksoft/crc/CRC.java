@@ -1,5 +1,8 @@
 package com.github.snksoft.crc;
 
+import java.nio.ByteBuffer;
+import java.util.function.IntFunction;
+
 // Copyright 2016, S&K Software Development Ltd.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
@@ -194,7 +197,31 @@ public class CRC
         return calculateCRC(crcParams, data, 0, data.length);
     }
 
+    /**
+     * This method works exactly like {@link #calculateCRC(Parameters, byte[])} but uses a ByteBuffer.
+     * The part of the ByteBuffer that is read is from it's current {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}.
+     * @see calculateCRC(Parameters, byte[])
+     */
+    public static long calculateCRC(Parameters crcParameters, ByteBuffer data)
+    {
+        return calculateCRC(crcParameters, data, data.position(), data.limit() - data.position());
+    }
+
     public static long calculateCRC(Parameters crcParams, byte[] data, int offset, int length)
+    {
+        return calculateCRC(crcParams, i -> data[i], offset, length);
+    }
+
+    /**
+     * This method works exactly like {@link #calculateCRC(Parameters, byte[], int, int)} but uses a ByteBuffer.
+     * @see calculateCRC(Parameters, byte[], int, int)
+     */
+    public static long calculateCRC(Parameters crcParams, ByteBuffer data, int offset, int length)
+    {
+        return calculateCRC(crcParams, data::get, offset, length);
+    }
+
+    private static long calculateCRC(Parameters crcParams, IntFunction<Byte> dataSupplier, int offset, int length)
     {
         long curValue = crcParams.init;
         long topBit = 1L << (crcParams.width - 1);
@@ -203,7 +230,8 @@ public class CRC
 
         for (int i = offset; i < end; i ++)
         {
-            long curByte = ((long)(data[i])) & 0x00FFL;
+            long dataByte = dataSupplier.apply(i);
+            long curByte = dataByte & 0x00FFL;
             if (crcParams.reflectIn)
             {
                 curByte = reflect(curByte, 8);
@@ -265,11 +293,25 @@ public class CRC
      * */
     public long update (long curValue, byte[] chunk, int offset, int length)
     {
+        return update(curValue, i -> chunk[i], offset, length);
+    }
+
+    /**
+     * This method works exactly like {@link #update(long, byte[], int, int)} but uses a ByteBuffer.
+     * @see update(long, byte[], int, int)
+     */
+    public long update (long curValue, ByteBuffer chunk, int offset, int length)
+    {
+        return update(curValue, chunk::get, offset, length);
+    }
+
+    private long update (long curValue, IntFunction<Byte> dataSupplier, int offset, int length)
+    {
         if (crcParams.reflectIn)
         {
             for (int i=0; i < length; i++)
             {
-                byte v = chunk[offset+i];
+                byte v = dataSupplier.apply(offset + i);
                 curValue = crctable[(((byte)curValue) ^ v)&0x00FF]^(curValue >>> 8);
             }
         }
@@ -277,7 +319,7 @@ public class CRC
         {
             for (int i=0; i < length; i++)
             {
-                byte v = chunk[offset+i];
+                byte v = dataSupplier.apply(offset + i);
                 curValue = crctable[((((byte)(curValue << (8-crcParams.width))) ^ v)&0xFF)]^(curValue << 8);
             }
         }
@@ -285,7 +327,7 @@ public class CRC
         {
             for (int i=0; i < length; i++)
             {
-                byte v = chunk[offset+i];
+                byte v = dataSupplier.apply(offset + i);
                 curValue = crctable[((((byte)(curValue >>> (crcParams.width - 8))) ^ v)&0xFF)]^(curValue << 8);
             }
         }
@@ -302,6 +344,17 @@ public class CRC
     public long update (long curValue, byte[] chunk)
     {
         return update(curValue, chunk, 0, chunk.length);
+    }
+
+    /**
+     * This method works exactly like {@link #update(long, byte[])} but uses a ByteBuffer.
+     * The part of the ByteBuffer that is read is from it's current {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}.
+     *
+     * @see update(long, byte[])
+     */
+    public long update (long curValue, ByteBuffer chunk)
+    {
+        return update(curValue, chunk, chunk.position(), chunk.limit() - chunk.position());
     }
 
     /**
@@ -329,7 +382,28 @@ public class CRC
         return calculateCRC(data, 0, data.length);
     }
 
+    /**
+     * This method works exactly like {@link #calculateCRC(byte[])} but uses a ByteBuffer.
+     * The part of the ByteBuffer that is read is from it's current {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}.
+     * @see calculateCRC(byte[])
+     */
+    public long calculateCRC(ByteBuffer data)
+    {
+        return calculateCRC(data, data.position(), data.limit() - data.position());
+    }
+
     public long calculateCRC(byte[] data, int offset, int length)
+    {
+        long crc = init();
+        crc = update(crc, data, offset, length);
+        return finalCRC(crc);
+    }
+
+    /**
+     * This method works exactly like {@link #calculateCRC(byte[], int, int)} but uses a ByteBuffer.
+     * @see calculateCRC(byte[], int, int)
+     */
+    public long calculateCRC(ByteBuffer data, int offset, int length)
     {
         long crc = init();
         crc = update(crc, data, offset, length);
