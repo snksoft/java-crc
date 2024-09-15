@@ -2,6 +2,8 @@ package com.github.snksoft.crc;
 
 import org.junit.jupiter.api.Test;
 
+import java.nio.ByteBuffer;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 public class CRCTests {
@@ -23,13 +25,31 @@ public class CRCTests {
     @Test
     public void testPolynomialsOfVariousWidth() {
         TestFunction3<CRC.Parameters, Long, byte[]> byteTest = (crcParams, crc , dataBytes) -> {
+            ByteBuffer byteBuffer = ByteBuffer.wrap(dataBytes);
+
             long calculated1 = CRC.calculateCRC(crcParams, dataBytes);
+            long calculated1b = CRC.calculateCRC(crcParams, byteBuffer);
 
             assertTrue(calculated1 == crc);
+            assertTrue(calculated1b == crc);
 
             CRC table = new CRC(crcParams);
             long tableBasedCrc = table.calculateCRC(dataBytes);
             assertTrue(tableBasedCrc == crc);
+            // same, using ByteBuffer
+            long tableBasedCrcByteBuffer = table.calculateCRC(byteBuffer);
+            assertTrue(tableBasedCrcByteBuffer == crc);
+
+            long tableBased2 = table.init();
+            tableBased2 = table.update(tableBased2, dataBytes);
+            tableBased2 = table.finalCRC(tableBased2);
+            assertTrue(tableBased2 == crc);
+
+            long tableBased2b = table.init();
+            tableBased2b = table.update(tableBased2b, byteBuffer);
+            tableBased2b = table.finalCRC(tableBased2b);
+            assertTrue(tableBased2b == crc);
+
         };
         TestFunction3<CRC.Parameters, Long, String> doTest = (crcParams, crc , data) -> {
             byte[] dataBytes = data.getBytes();
@@ -78,11 +98,14 @@ public class CRCTests {
     public void testCRC8() {
         TestFunction3<CRC.Parameters, Long, String> doTest = (crcParams, crc , data) -> {
             byte[] dataBytes = data.getBytes();
+            ByteBuffer byteBuffer = ByteBuffer.wrap(dataBytes);
             long calculated1 = CRC.calculateCRC(crcParams, dataBytes);
+            long calculated1b = CRC.calculateCRC(crcParams, byteBuffer);
 
             // same test using table driven
             CRC tableDriven = new CRC(crcParams);
             long calculated2 = tableDriven.calculateCRC(dataBytes);
+            long calculated2b = tableDriven.calculateCRC(byteBuffer);
 
             // same test feeding data in chunks of different size
             long curValue = tableDriven.init();
@@ -99,9 +122,27 @@ public class CRCTests {
             }
             byte calculated3 = tableDriven.finalCRC8(curValue);
 
+            // same test feeding data in chunks of different size, but using ByteBuffer
+            curValue = tableDriven.init();
+            start = 0;
+            step = 3;
+            int length = dataBytes.length; // ByteBuffer limit() is same as dataBytes.length()
+            while (start < length) {
+                int end = start + step;
+                if (end > length) {
+                    end = length;
+                }
+                curValue = tableDriven.update(curValue, byteBuffer, start, end - start);
+                start = end;
+            }
+            byte calculated3b = tableDriven.finalCRC8(curValue);
+
             assertTrue(calculated1 == crc);
             assertTrue(calculated2 == crc);
             assertTrue(calculated3 == (byte) (crc & 0x00FF));
+            assertTrue(calculated1b == crc);
+            assertTrue(calculated2b == crc);
+            assertTrue(calculated3b == (byte) (crc & 0x00FF));
         };
 
         doTest.apply(new CRC.Parameters(8, 0x07, 0, false, false, 0), 0xf4L, "123456789");
@@ -111,11 +152,14 @@ public class CRCTests {
     public void testCRC16() {
         TestFunction3<CRC.Parameters, Long, String> doTest = (crcParams, crc , data) -> {
             byte[] dataBytes = data.getBytes();
+            ByteBuffer byteBuffer = ByteBuffer.wrap(dataBytes);
             long calculated1 = CRC.calculateCRC(crcParams, dataBytes);
+            long calculated1b = CRC.calculateCRC(crcParams, byteBuffer);
 
             // same test using table driven
             CRC tableDriven = new CRC(crcParams);
             long calculated2 = tableDriven.calculateCRC(dataBytes);
+            long calculated2b = tableDriven.calculateCRC(byteBuffer);
 
             // same test feeding data in chunks of different size
             long curValue = tableDriven.init();
@@ -132,9 +176,27 @@ public class CRCTests {
             }
             short calculated3 = tableDriven.finalCRC16(curValue);
 
+            // same test feeding data in chunks of different size
+            curValue = tableDriven.init();
+            start = 0;
+            step = 7;
+            int length = byteBuffer.limit();
+            while (start < length) {
+                int end = start + step;
+                if (end > length) {
+                    end = length;
+                }
+                curValue = tableDriven.update(curValue, byteBuffer, start, end - start);
+                start = end;
+            }
+            short calculated3b = tableDriven.finalCRC16(curValue);
+
             assertTrue(calculated1 == crc);
             assertTrue(calculated2 == crc);
             assertTrue(calculated3 == (short) (crc & 0x0000FFFF));
+            assertTrue(calculated1b == crc);
+            assertTrue(calculated2b == crc);
+            assertTrue(calculated3b == (short) (crc & 0x0000FFFF));
         };
 
         doTest.apply(CRC.Parameters.CCITT, 0x29B1L, "123456789");
@@ -158,11 +220,14 @@ public class CRCTests {
     public void testCRC32() {
         TestFunction3<CRC.Parameters, Long, String> doTest = (crcParams, crc , data) -> {
             byte[] dataBytes = data.getBytes();
+            ByteBuffer byteBuffer = ByteBuffer.wrap(dataBytes);
             long calculated1 = CRC.calculateCRC(crcParams, dataBytes);
+            long calculated1b = CRC.calculateCRC(crcParams, byteBuffer);
 
             // same test using table driven
             CRC tableDriven = new CRC(crcParams);
             long calculated2 = tableDriven.calculateCRC(dataBytes);
+            long calculated2b = tableDriven.calculateCRC(byteBuffer);
 
             // same test feeding data in chunks of different size
             long curValue = tableDriven.init();
@@ -179,9 +244,27 @@ public class CRCTests {
             }
             int calculated3 = tableDriven.finalCRC32(curValue);
 
+            // same test feeding data in chunks of different size, but using byte buffer
+            curValue = tableDriven.init();
+            start = 0;
+            step = 1;
+            while (start < dataBytes.length) {
+                int end = start + step;
+                if (end > dataBytes.length) {
+                    end = dataBytes.length;
+                }
+                curValue = tableDriven.update(curValue, byteBuffer, start, end - start);
+                start = end;
+                step *= 2;
+            }
+            int calculated3b = tableDriven.finalCRC32(curValue);
+
             assertTrue(calculated1 == crc);
             assertTrue(calculated2 == crc);
             assertTrue(calculated3 == (int) (crc & 0x0FFFFFFFFL));
+            assertTrue(calculated1b == crc);
+            assertTrue(calculated2b == crc);
+            assertTrue(calculated3b == (int) (crc & 0x0FFFFFFFFL));
 
             final long cv = curValue; // has to be final to be captured in a lambda below
             assertThrows(RuntimeException.class, () -> { tableDriven.finalCRC16(cv); });
@@ -233,11 +316,15 @@ public class CRCTests {
     public void testCRC64() {
         TestFunction3<CRC.Parameters, Long, String> doTest = (crcParams, crc , data) -> {
             byte[] dataBytes = data.getBytes();
+            ByteBuffer byteBuffer = ByteBuffer.wrap(dataBytes);
+
             long calculated1 = CRC.calculateCRC(crcParams, dataBytes);
+            long calculated1b = CRC.calculateCRC(crcParams, byteBuffer);
 
             // same test using table driven
             CRC tableDriven = new CRC(crcParams);
             long calculated2 = tableDriven.calculateCRC(dataBytes);
+            long calculated2b = tableDriven.calculateCRC(byteBuffer);
 
             // same test feeding data in chunks of different size
             long curValue = tableDriven.init();
@@ -254,10 +341,29 @@ public class CRCTests {
             }
             long calculated3 = tableDriven.finalCRC(curValue);
 
+            // same test feeding data in chunks of different size from the byte buffer
+            // (note that byte buffer has same length as the byte array and that is used in the code below)
+            curValue = tableDriven.init();
+            start = 0;
+            step = 5;
+            while (start < dataBytes.length) {
+                int end = start + step;
+                if (end > dataBytes.length) {
+                    end = dataBytes.length;
+                }
+                curValue = tableDriven.update(curValue, byteBuffer, start, end - start);
+                start = end;
+                step *= 2;
+            }
+            long calculated3b = tableDriven.finalCRC(curValue);
+
             then:
             assertTrue(calculated1 == crc);
             assertTrue(calculated2 == crc);
             assertTrue(calculated3 == crc);
+            assertTrue(calculated1b == crc);
+            assertTrue(calculated2b == crc);
+            assertTrue(calculated3b == crc);
 
 
             final long cv = curValue; // has to be final to be captured in a lambda below

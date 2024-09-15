@@ -134,7 +134,7 @@ public class CRC
         /** XMODEM2 is another set of CRC parameters commonly referred as "XMODEM" */
         public static final Parameters XMODEM2 = new Parameters(16, 0x8408, 0x0000, true, true, 0x0);
 
-        /** CRC32 is by far the the most commonly used CRC-32 polynom and set of parameters */
+        /** CRC32 is by far the most commonly used CRC-32 polynomial and set of parameters */
         public static final Parameters CRC32 = new Parameters(32, 0x04C11DB7, 0x00FFFFFFFFL, true, true, 0x00FFFFFFFFL);
         /** IEEE is an alias to CRC32 */
         public static final Parameters IEEE = CRC32;
@@ -154,7 +154,7 @@ public class CRC
 
     /**
      * Reverses order of last count bits.
-     * @param  in value wich bits need to be reversed
+     * @param  in value which bits need to be reversed
      * @param count indicates how many bits be rearranged
      * @return      the value with specified bits order reversed
      */
