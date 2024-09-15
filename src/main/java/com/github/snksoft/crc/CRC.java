@@ -178,15 +178,8 @@ public class CRC
     }
 
     /**
-     * This method implements simple straight forward bit by bit calculation.
-     * It is relatively slow for large amounts of data, but does not require
-     * any preparation steps. As a result, it might be faster in some cases
-     * then building a table required for faster calculation.
-     *
-     * Note: this implementation follows section 8 ("A Straightforward CRC Implementation")
-     * of Ross N. Williams paper as even though final/sample implementation of this algorithm
-     * provided near the end of that paper (and followed by most other implementations)
-     * is a bit faster, it does not work for polynomials shorter then 8 bits.
+     * This is a convenience method calculating CRC of a whole byte array.
+     * Underneath, it just calls {@link #calculateCRC(Parameters, byte[], int, int)}
      *
      * @param  crcParams CRC algorithm parameters
      * @param  data data for the CRC calculation
@@ -199,29 +192,104 @@ public class CRC
 
     /**
      * This method works exactly like {@link #calculateCRC(Parameters, byte[])} but uses a ByteBuffer.
-     * The part of the ByteBuffer that is read is from it's current {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}.
-     * @see calculateCRC(Parameters, byte[])
+     * The part of the ByteBuffer that is read is from its current {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}.
+     * @see #calculateCRC(Parameters, byte[])
      */
     public static long calculateCRC(Parameters crcParameters, ByteBuffer data)
     {
         return calculateCRC(crcParameters, data, data.position(), data.limit() - data.position());
     }
 
+    /**
+     * This method implements simple straight forward bit by bit calculation
+     * and allows to calculate CRC of any part of the provided byte array.
+     * It is relatively slow for large amounts of data, but does not require
+     * any preparation steps. As a result, it might be faster in some cases
+     * then building a table required for faster calculation.
+
+     * Note: this implementation follows section 8 ("A Straightforward CRC Implementation")
+     * of Ross N. Williams paper as even though final/sample implementation of this algorithm
+     * provided near the end of that paper (and followed by most other implementations)
+     * is a bit faster, it does not work for polynomials shorter than 8 bits.
+
+     * @param  crcParams CRC algorithm parameters
+     * @param  data data for the CRC calculation
+     * @param  offset the offset within the array of the first byte to be included in calculations
+     * @param  length number of bytes to process
+     * @return      the CRC value of the data provided
+     */
     public static long calculateCRC(Parameters crcParams, byte[] data, int offset, int length)
     {
-        return calculateCRC(crcParams, i -> data[i], offset, length);
+        long curValue = crcParams.init;
+        long topBit = 1L << (crcParams.width - 1);
+        long mask = (topBit << 1) - 1;
+        int end = offset + length;
+
+        for (int i = offset; i < end; i ++)
+        {
+            long curByte = ((long)(data[i])) & 0x00FFL;
+            if (crcParams.reflectIn)
+            {
+                curByte = reflect(curByte, 8);
+            }
+
+            for (int j = 0x80; j != 0; j >>= 1)
+            {
+                long bit = curValue & topBit;
+                curValue <<= 1;
+
+                if ((curByte & j) != 0)
+                {
+                    bit ^= topBit;
+                }
+
+                if (bit != 0)
+                {
+                    curValue ^= crcParams.polynomial;
+                }
+            }
+
+        }
+
+        if (crcParams.reflectOut)
+        {
+            curValue = reflect(curValue, crcParams.width);
+        }
+
+        curValue = curValue ^ crcParams.finalXor;
+
+        return curValue & mask;
     }
 
     /**
-     * This method works exactly like {@link #calculateCRC(Parameters, byte[], int, int)} but uses a ByteBuffer.
-     * @see calculateCRC(Parameters, byte[], int, int)
+     * This method calculates CRC over a portion of a ByteBuffer.
+     * Underneath, it calls {@link #calculateCRC(Parameters, IntFunction, int, int)} and uses
+     * {@link ByteBuffer#get(int)} as the data supplier function.
+     * @see #calculateCRC(Parameters, byte[], int, int)
      */
     public static long calculateCRC(Parameters crcParams, ByteBuffer data, int offset, int length)
     {
         return calculateCRC(crcParams, data::get, offset, length);
     }
 
-    private static long calculateCRC(Parameters crcParams, IntFunction<Byte> dataSupplier, int offset, int length)
+    /**
+     * This method works exactly like {@link #calculateCRC(Parameters, byte[], int, int)} but provides extra
+     * abstraction by supporting pretty much any source of bytes as long as a function to supply them can be defined.
+     * Note: The extra level of abstraction does not come free - it comes with a function call for each byte retrieved/accessed.
+     * As a result, this function is substantially slower then {@link #calculateCRC(Parameters, byte[], int, int)} on some data
+     * (typically, 10-20% slower in my tests and up to 30% slower in some cases). But if speed is important, you probably should
+     * be using the table based variant anyway. Do your own profiling and see which one works best for you.
+     * @see #calculateCRC(Parameters, byte[], int, int)
+
+     * @param  crcParams CRC algorithm parameters
+     * @param  dataSupplier a function taking an index of a byte and returning the byte; note that this algorithm process
+     *                      bytes sequentially, so technically, dataSupplier can ignore the argument and just return a next
+     *                      byte (but be cautious when doing that as resulting behavior might become confusing)
+     * @param offset is 0-based offset of the data to be processed in the array supplied
+     * @param length indicates number of bytes to be processed.
+     * @return      the CRC value of the data provided
+     */
+    public static long calculateCRC(Parameters crcParams, IntFunction<Byte> dataSupplier, int offset, int length)
     {
         long curValue = crcParams.init;
         long topBit = 1L << (crcParams.width - 1);
@@ -286,26 +354,73 @@ public class CRC
      * and finalCRC methods, possibly supplying data in chunks). It can be called multiple times per
      * CRC calculation to feed data to be processed in chunks.
      * @param curValue CRC intermediate value so far
-     * @param chunk data chunk to b processed by this call
+     * @param chunk data chunk to be processed by this call
      * @param offset is 0-based offset of the data to be processed in the array supplied
      * @param length indicates number of bytes to be processed.
      * @return updated intermediate value for this CRC
      * */
     public long update (long curValue, byte[] chunk, int offset, int length)
     {
-        return update(curValue, i -> chunk[i], offset, length);
+        if (crcParams.reflectIn)
+        {
+            for (int i=0; i < length; i++)
+            {
+                byte v = chunk[offset+i];
+                curValue = crctable[(((byte)curValue) ^ v)&0x00FF]^(curValue >>> 8);
+            }
+        }
+        else if (crcParams.width<8)
+        {
+            for (int i=0; i < length; i++)
+            {
+                byte v = chunk[offset+i];
+                curValue = crctable[((((byte)(curValue << (8-crcParams.width))) ^ v)&0xFF)]^(curValue << 8);
+            }
+        }
+        else
+        {
+            for (int i=0; i < length; i++)
+            {
+                byte v = chunk[offset+i];
+                curValue = crctable[((((byte)(curValue >>> (crcParams.width - 8))) ^ v)&0xFF)]^(curValue << 8);
+            }
+        }
+
+        return curValue;
     }
 
     /**
      * This method works exactly like {@link #update(long, byte[], int, int)} but uses a ByteBuffer.
-     * @see update(long, byte[], int, int)
+     * Underneath, it calls {@link #update(long, IntFunction, int, int)} and uses
+     * {@link ByteBuffer#get(int)} as the data supplier function.
+     * @see #update(long, byte[], int, int)
      */
     public long update (long curValue, ByteBuffer chunk, int offset, int length)
     {
         return update(curValue, chunk::get, offset, length);
     }
 
-    private long update (long curValue, IntFunction<Byte> dataSupplier, int offset, int length)
+    /**
+     * This method works exactly like {@link #update(long, byte[], int, int)} but provides extra
+     * abstraction by supporting pretty much any source of bytes as long as a function to supply them can be defined.
+
+     * Note: The extra level of abstraction does not come free - it comes with a function call for each byte retrieved/accessed.
+     * As a result, this function is substantially slower then {@link #update(long, byte[], int, int)}. For short running processes
+     * using pre-allocated byte buffers to copy data to and to pass to {@link #update(long, byte[], int, int)} will usually be faster
+     * (although at the cost of extra complexity). However, for long-running processes JVM does seem to optimise calls eventually and
+     * in my tests performance penalty eventually dropped to less than 1% when compared to {@link #update(long, byte[], int, int)}.
+     * Do your own profiling and see which option works best for you.
+     * @see #calculateCRC(Parameters, byte[], int, int)
+
+     * @param curValue CRC intermediate value so far
+     * @param  dataSupplier a function taking an index of a byte and returning the byte; note that this algorithm process
+     *                      bytes sequentially, so technically, dataSupplier can ignore the argument and just return a next
+     *                      byte (but be cautious when doing that as resulting behavior might become confusing)
+     * @param offset is 0-based offset of the data to be processed in the array supplied
+     * @param length indicates number of bytes to be processed.
+     * @return      the CRC value of the data provided
+     */
+    public long update (long curValue, IntFunction<Byte> dataSupplier, int offset, int length)
     {
         if (crcParams.reflectIn)
         {
@@ -347,10 +462,11 @@ public class CRC
     }
 
     /**
-     * This method works exactly like {@link #update(long, byte[])} but uses a ByteBuffer.
-     * The part of the ByteBuffer that is read is from it's current {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}.
+     * This calculates CRC over a part of ByteBuffer content. Underneath, it calls {@link #update(long, IntFunction, int, int)}
+     * and uses {@link ByteBuffer#get(int)} as the data supplier function.
+     * The part of the ByteBuffer that is processed is from its current {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}.
      *
-     * @see update(long, byte[])
+     * @see #update(long, IntFunction, int, int)
      */
     public long update (long curValue, ByteBuffer chunk)
     {
@@ -383,9 +499,9 @@ public class CRC
     }
 
     /**
-     * This method works exactly like {@link #calculateCRC(byte[])} but uses a ByteBuffer.
-     * The part of the ByteBuffer that is read is from it's current {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}.
-     * @see calculateCRC(byte[])
+     * This is a convenience method. Underneath, it just calls {@link #calculateCRC(ByteBuffer, int, int)} to
+     * calculate CRC of bytes from buffer's current {@link ByteBuffer#position()} to {@link ByteBuffer#limit()}.
+     * @see #calculateCRC(ByteBuffer, int, int)
      */
     public long calculateCRC(ByteBuffer data)
     {
@@ -401,7 +517,7 @@ public class CRC
 
     /**
      * This method works exactly like {@link #calculateCRC(byte[], int, int)} but uses a ByteBuffer.
-     * @see calculateCRC(byte[], int, int)
+     * @see #calculateCRC(byte[], int, int)
      */
     public long calculateCRC(ByteBuffer data, int offset, int length)
     {
